@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MIDE Dashboard - Upload Local</title>
+    <title>MIDE Dashboard - Cloud Sync</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
@@ -54,7 +54,7 @@
             -webkit-text-fill-color: transparent;
         }
 
-        .storage-info {
+        .cloud-status {
             display: flex;
             align-items: center;
             gap: 0.5rem;
@@ -62,7 +62,7 @@
             color: var(--gray);
         }
 
-        .storage-dot {
+        .cloud-dot {
             width: 8px;
             height: 8px;
             border-radius: 50%;
@@ -70,9 +70,23 @@
             animation: pulse 2s infinite;
         }
 
+        .cloud-dot.syncing {
+            background: var(--warning);
+            animation: spin 1s linear infinite;
+        }
+
+        .cloud-dot.error {
+            background: var(--danger);
+            animation: none;
+        }
+
         @keyframes pulse {
             0%, 100% { opacity: 1; }
             50% { opacity: 0.5; }
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
         }
 
         .container {
@@ -125,18 +139,38 @@
             margin-top: 0.5rem;
         }
 
-        .file-info {
-            background: rgba(0, 200, 83, 0.1);
-            border: 1px solid var(--secondary);
+        .config-section {
+            background: rgba(0, 132, 255, 0.1);
+            border: 1px solid rgba(0, 132, 255, 0.3);
             border-radius: 12px;
-            padding: 1rem;
-            margin-top: 1rem;
-            display: none;
+            padding: 1.5rem;
+            margin-top: 1.5rem;
         }
 
-        .file-info.active {
+        .config-section h3 {
+            margin-bottom: 1rem;
+            color: var(--primary);
+        }
+
+        .input-group {
+            margin-bottom: 1rem;
+        }
+
+        .input-group label {
             display: block;
-            animation: fadeIn 0.3s;
+            margin-bottom: 0.5rem;
+            color: var(--gray);
+            font-size: 0.875rem;
+        }
+
+        .url-input {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--glass-border);
+            border-radius: 10px;
+            padding: 0.75rem;
+            color: white;
+            font-size: 0.875rem;
         }
 
         .btn {
@@ -169,6 +203,12 @@
 
         .btn-success {
             background: linear-gradient(135deg, var(--secondary) 0%, #00a344 100%);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
         }
 
         .dashboard-content {
@@ -355,10 +395,6 @@
             animation: spin 1s linear infinite;
         }
 
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
         .toast {
             position: fixed;
             bottom: 2rem;
@@ -391,35 +427,70 @@
             display: block;
         }
 
-        .storage-warning {
-            background: rgba(255, 145, 0, 0.1);
-            border: 1px solid var(--warning);
-            color: var(--warning);
+        .success-message {
+            background: rgba(0, 200, 83, 0.1);
+            border: 1px solid var(--secondary);
+            color: var(--secondary);
             padding: 1rem;
             border-radius: 8px;
             margin-top: 1rem;
-            font-size: 0.875rem;
-        }
-
-        .progress-bar {
-            width: 100%;
-            height: 4px;
-            background: rgba(255,255,255,0.1);
-            border-radius: 2px;
-            margin-top: 1rem;
-            overflow: hidden;
             display: none;
         }
 
-        .progress-bar.active {
+        .success-message.active {
             display: block;
         }
 
-        .progress-fill {
-            height: 100%;
-            background: linear-gradient(90deg, var(--primary), var(--secondary));
-            width: 0%;
-            transition: width 0.3s;
+        .mode-selector {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        .mode-card {
+            flex: 1;
+            min-width: 200px;
+            background: var(--glass);
+            border: 2px solid var(--glass-border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: center;
+        }
+
+        .mode-card:hover {
+            border-color: var(--primary);
+            transform: translateY(-2px);
+        }
+
+        .mode-card.selected {
+            border-color: var(--primary);
+            background: rgba(0, 132, 255, 0.1);
+        }
+
+        .mode-icon {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .mode-title {
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+
+        .mode-desc {
+            font-size: 0.875rem;
+            color: var(--gray);
+        }
+
+        .sync-panel {
+            background: rgba(0, 200, 83, 0.1);
+            border: 1px solid var(--secondary);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-top: 1rem;
         }
 
         @media (max-width: 768px) {
@@ -430,6 +501,10 @@
             .upload-area {
                 padding: 2rem 1rem;
             }
+
+            .mode-card {
+                min-width: 100%;
+            }
         }
     </style>
 </head>
@@ -437,60 +512,96 @@
     <!-- Loading Overlay -->
     <div class="loading-overlay" id="loadingOverlay">
         <div class="spinner"></div>
-        <p>Processando arquivo...</p>
+        <p id="loadingText">Processando...</p>
     </div>
 
     <!-- Header -->
     <div class="header">
         <div class="logo">🎯 MIDE Dashboard</div>
-        <div class="storage-info" id="storageInfo" style="display: none;">
-            <span class="storage-dot"></span>
-            <span id="storageText">Dados salvos localmente</span>
+        <div class="cloud-status" id="cloudStatus" style="display: none;">
+            <span class="cloud-dot" id="cloudDot"></span>
+            <span id="cloudText">☁️ Sincronizado</span>
         </div>
     </div>
 
     <div class="container">
-        <!-- Upload Panel -->
-        <div class="upload-panel" id="uploadPanel">
-            <h2 style="margin-bottom: 1rem;">📁 Upload de Arquivo</h2>
+        <!-- Setup Panel -->
+        <div class="upload-panel" id="setupPanel">
+            <h2 style="margin-bottom: 1rem;">☁️ Configurar Armazenamento</h2>
             
+            <!-- Mode Selector -->
+            <div class="mode-selector">
+                <div class="mode-card selected" onclick="selectMode('local')" id="modeLocal">
+                    <div class="mode-icon">💻</div>
+                    <div class="mode-title">Local (Navegador)</div>
+                    <div class="mode-desc">Dados ficam apenas neste dispositivo. Rápido e privado.</div>
+                </div>
+                <div class="mode-card" onclick="selectMode('github')" id="modeGitHub">
+                    <div class="mode-icon">🐙</div>
+                    <div class="mode-title">GitHub (Nuvem)</div>
+                    <div class="mode-desc">Dados salvos no repositório. Acesse de qualquer lugar.</div>
+                </div>
+                <div class="mode-card" onclick="selectMode('jsonbin')" id="modeJsonBin">
+                    <div class="mode-icon">🗄️</div>
+                    <div class="mode-title">JSONBin (Nuvem)</div>
+                    <div class="mode-desc">Serviço externo gratuito. Sem necessidade de GitHub.</div>
+                </div>
+            </div>
+
+            <!-- GitHub Config -->
+            <div class="config-section" id="githubConfig" style="display: none;">
+                <h3>🔑 Configuração GitHub</h3>
+                <div class="input-group">
+                    <label>Token de Acesso Pessoal (Classic):</label>
+                    <input type="password" class="url-input" id="githubToken" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx">
+                    <small style="color: var(--gray); display: block; margin-top: 0.5rem;">
+                        Crie em: Settings > Developer settings > Personal access tokens > Tokens (classic) > Generate new token (classic).
+                        <br>Marque a permissão: <strong>repo</strong> (acesso total ao repositório)
+                    </small>
+                </div>
+                <div class="input-group">
+                    <label>Repositório (formato: usuario/repo):</label>
+                    <input type="text" class="url-input" id="githubRepo" placeholder="meuusuario/mide-dashboard">
+                </div>
+                <button class="btn" onclick="testGitHubConnection()">🔌 Testar Conexão</button>
+                <button class="btn btn-success" onclick="saveGitHubConfig()">💾 Salvar Configuração</button>
+            </div>
+
+            <!-- JSONBin Config -->
+            <div class="config-section" id="jsonbinConfig" style="display: none;">
+                <h3>🔑 Configuração JSONBin.io</h3>
+                <div class="input-group">
+                    <label>API Key (obtenha em jsonbin.io):</label>
+                    <input type="password" class="url-input" id="jsonbinKey" placeholder="$2b$10...">
+                </div>
+                <div class="input-group">
+                    <label>Bin ID (deixe vazio para criar novo):</label>
+                    <input type="text" class="url-input" id="jsonbinId" placeholder="Deixe vazio para criar automaticamente">
+                </div>
+                <button class="btn" onclick="testJsonBinConnection()">🔌 Testar Conexão</button>
+                <button class="btn btn-success" onclick="saveJsonBinConfig()">💾 Salvar Configuração</button>
+                <div class="success-message" id="jsonbinSuccess" style="margin-top: 1rem;">
+                    ✅ Configuração salva! Seu Bin ID: <span id="savedBinId"></span>
+                </div>
+            </div>
+
+            <!-- Upload Area -->
             <div class="upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()">
                 <input type="file" id="fileInput" accept=".csv,.xlsx,.xls" onchange="handleFileSelect(event)">
                 <div class="upload-icon">📊</div>
                 <h3>Clique ou arraste seu arquivo aqui</h3>
                 <p class="file-types">Formatos aceitos: CSV, Excel (.xlsx, .xls)</p>
-                <div class="progress-bar" id="progressBar">
-                    <div class="progress-fill" id="progressFill"></div>
-                </div>
-            </div>
-
-            <div class="file-info" id="fileInfo">
-                <strong>✅ Arquivo carregado:</strong> <span id="fileName"></span>
-                <br><small style="color: var(--gray)">Registros: <span id="recordCount">0</span> | Última atualização: <span id="lastUpload"></span></small>
-                <div style="margin-top: 1rem;">
-                    <button class="btn" onclick="processFile()">🔄 Processar Novamente</button>
-                    <button class="btn btn-danger" onclick="clearData()">🗑️ Limpar Dados</button>
-                    <button class="btn btn-success" onclick="downloadTemplate()">📋 Baixar Template</button>
-                </div>
             </div>
 
             <div class="error-message" id="errorMessage"></div>
-            
-            <div class="storage-warning" id="storageWarning" style="display: none;">
-                ⚠️ <strong>Atenção:</strong> Os dados são armazenados apenas neste navegador. Limpar o cache do navegador ou usar modo anônimo apagará os dados.
-            </div>
 
             <div style="margin-top: 1.5rem; padding: 1rem; background: rgba(0,132,255,0.1); border-radius: 8px; font-size: 0.875rem;">
-                <strong>📖 Instruções:</strong>
-                <ol style="margin-left: 1.2rem; margin-top: 0.5rem;">
-                    <li>Exporte seus dados do Meta Ads ou Google Ads</li>
-                    <li>Salve como CSV ou Excel (.xlsx)</li>
-                    <li>Arraste ou clique para fazer upload</li>
-                    <li>Os dados ficarão salvos até você limpar</li>
-                </ol>
-                <p style="margin-top: 0.5rem; color: var(--gray);">
-                    💡 <strong>Dica:</strong> O sistema detecta automaticamente as colunas (Data, Campanha, Gasto, Compras, ROAS, etc.)
-                </p>
+                <strong>📖 Como funciona:</strong>
+                <ul style="margin-left: 1.2rem; margin-top: 0.5rem;">
+                    <li><strong>Local:</strong> Dados ficam no navegador (localStorage). Só acessível neste dispositivo.</li>
+                    <li><strong>GitHub:</strong> Dados salvos em arquivo JSON no seu repositório. Acesse de qualquer lugar.</li>
+                    <li><strong>JSONBin:</strong> Serviço gratuito de armazenamento JSON. Compartilhável via link.</li>
+                </ul>
             </div>
         </div>
 
@@ -500,20 +611,32 @@
             <!-- Data Status Bar -->
             <div class="data-status">
                 <div class="data-info">
-                    <span class="data-badge">💾 Dados Persistidos</span>
+                    <span class="data-badge" id="storageBadge">💾 Local</span>
                     <span id="dataSummary" style="color: var(--gray); font-size: 0.875rem;"></span>
                 </div>
                 <div>
                     <button class="btn btn-secondary" onclick="showUpload()">
                         📁 Novo Arquivo
                     </button>
+                    <button class="btn btn-secondary" onclick="syncData()" id="syncBtn">
+                        🔄 Sincronizar
+                    </button>
                     <button class="btn btn-secondary" onclick="exportData()">
                         💾 Exportar CSV
                     </button>
-                    <button class="btn btn-danger" onclick="clearData()">
-                        🗑️ Limpar
+                    <button class="btn btn-danger" onclick="clearAllData()">
+                        🗑️ Limpar Tudo
                     </button>
                 </div>
+            </div>
+
+            <!-- Sync Panel (aparece quando necessário) -->
+            <div class="sync-panel" id="syncPanel" style="display: none;">
+                <h4>☁️ Sincronização com Nuvem</h4>
+                <p style="color: var(--gray); margin: 0.5rem 0;">
+                    Seus dados estão prontos para upload. Clique em "Sincronizar Agora" para salvar na nuvem.
+                </p>
+                <button class="btn btn-success" onclick="uploadToCloud()">☁️ Sincronizar Agora</button>
             </div>
 
             <!-- Filters -->
@@ -588,151 +711,244 @@
     <div class="toast" id="toast"></div>
 
     <script>
-        // Configuração
-        const STORAGE_KEY = 'mide_dashboard_data_v2';
-        const FILE_INFO_KEY = 'mide_dashboard_file_info';
-        
+        // Configuração Global
+        const CONFIG = {
+            STORAGE_MODE: 'local', // 'local', 'github', 'jsonbin'
+            GITHUB_TOKEN: '',
+            GITHUB_REPO: '',
+            GITHUB_BRANCH: 'main',
+            GITHUB_FILE_PATH: 'data/campaigns.json',
+            JSONBIN_KEY: '',
+            JSONBIN_ID: '',
+            LOCAL_KEY: 'mide_dashboard_data_v3'
+        };
+
         let allData = [];
         let filteredData = [];
         let chart = null;
-        let currentFile = null;
+        let pendingSync = false;
 
         // Inicialização
         window.addEventListener('load', () => {
-            loadStoredData();
+            loadConfig();
             setupDragDrop();
+            
+            // Tentar carregar dados existentes
+            loadData();
         });
 
-        // Setup Drag and Drop
-        function setupDragDrop() {
-            const uploadArea = document.getElementById('uploadArea');
+        // Seleção de Modo
+        function selectMode(mode) {
+            CONFIG.STORAGE_MODE = mode;
             
-            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-                uploadArea.addEventListener(eventName, preventDefaults, false);
-            });
-
-            function preventDefaults(e) {
-                e.preventDefault();
-                e.stopPropagation();
-            }
-
-            ['dragenter', 'dragover'].forEach(eventName => {
-                uploadArea.addEventListener(eventName, () => {
-                    uploadArea.classList.add('dragover');
-                }, false);
-            });
-
-            ['dragleave', 'drop'].forEach(eventName => {
-                uploadArea.addEventListener(eventName, () => {
-                    uploadArea.classList.remove('dragover');
-                }, false);
-            });
-
-            uploadArea.addEventListener('drop', handleDrop, false);
+            // UI
+            document.querySelectorAll('.mode-card').forEach(c => c.classList.remove('selected'));
+            document.getElementById('mode' + mode.charAt(0).toUpperCase() + mode.slice(1)).classList.add('selected');
+            
+            // Mostrar config específica
+            document.getElementById('githubConfig').style.display = mode === 'github' ? 'block' : 'none';
+            document.getElementById('jsonbinConfig').style.display = mode === 'jsonbin' ? 'block' : 'none';
+            
+            saveConfig();
         }
 
-        function handleDrop(e) {
-            const dt = e.dataTransfer;
-            const files = dt.files;
-            if (files.length > 0) {
-                handleFile(files[0]);
-            }
-        }
-
-        function handleFileSelect(e) {
-            if (e.target.files.length > 0) {
-                handleFile(e.target.files[0]);
-            }
-        }
-
-        // Processar arquivo
-        async function handleFile(file) {
-            currentFile = file;
+        // Configuração GitHub
+        function testGitHubConnection() {
+            const token = document.getElementById('githubToken').value.trim();
+            const repo = document.getElementById('githubRepo').value.trim();
             
-            // Validar extensão
-            const validTypes = ['.csv', '.xlsx', '.xls'];
-            const ext = '.' + file.name.split('.').pop().toLowerCase();
-            
-            if (!validTypes.includes(ext)) {
-                showError('Formato não suportado. Use CSV ou Excel (.xlsx, .xls)');
+            if (!token || !repo) {
+                showError('Preencha token e repositório');
                 return;
             }
 
-            showLoading(true);
+            showLoading(true, 'Testando conexão...');
+            
+            fetch(`https://api.github.com/repos/${repo}`, {
+                headers: {
+                    'Authorization': `token ${token}`,
+                    'Accept': 'application/vnd.github.v3+json'
+                }
+            })
+            .then(r => {
+                if (r.ok) {
+                    showToast('✅ Conexão GitHub OK!');
+                } else {
+                    throw new Error('Falha na conexão');
+                }
+            })
+            .catch(e => {
+                showError('Erro GitHub: ' + e.message);
+            })
+            .finally(() => showLoading(false));
+        }
+
+        function saveGitHubConfig() {
+            CONFIG.GITHUB_TOKEN = document.getElementById('githubToken').value.trim();
+            CONFIG.GITHUB_REPO = document.getElementById('githubRepo').value.trim();
+            saveConfig();
+            showToast('💾 Configuração GitHub salva!');
+        }
+
+        // Configuração JSONBin
+        function testJsonBinConnection() {
+            const key = document.getElementById('jsonbinKey').value.trim();
+            
+            if (!key) {
+                showError('Preencha a API Key');
+                return;
+            }
+
+            showLoading(true, 'Testando JSONBin...');
+            
+            fetch('https://api.jsonbin.io/v3/b', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Master-Key': key,
+                    'X-Bin-Private': 'false'
+                },
+                body: JSON.stringify({ test: true, timestamp: new Date().toISOString() })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.metadata && data.metadata.id) {
+                    document.getElementById('jsonbinId').value = data.metadata.id;
+                    showToast('✅ JSONBin conectado! Bin ID preenchido automaticamente.');
+                }
+            })
+            .catch(e => {
+                showError('Erro JSONBin: ' + e.message);
+            })
+            .finally(() => showLoading(false));
+        }
+
+        function saveJsonBinConfig() {
+            CONFIG.JSONBIN_KEY = document.getElementById('jsonbinKey').value.trim();
+            CONFIG.JSONBIN_ID = document.getElementById('jsonbinId').value.trim();
+            saveConfig();
+            
+            document.getElementById('savedBinId').textContent = CONFIG.JSONBIN_ID;
+            document.getElementById('jsonbinSuccess').classList.add('active');
+            showToast('💾 Configuração JSONBin salva!');
+        }
+
+        // Persistência de Config
+        function saveConfig() {
+            localStorage.setItem('mide_config', JSON.stringify({
+                mode: CONFIG.STORAGE_MODE,
+                githubRepo: CONFIG.GITHUB_REPO,
+                jsonbinId: CONFIG.JSONBIN_ID
+                // Não salvamos tokens por segurança
+            }));
+        }
+
+        function loadConfig() {
+            const saved = localStorage.getItem('mide_config');
+            if (saved) {
+                const cfg = JSON.parse(saved);
+                CONFIG.STORAGE_MODE = cfg.mode || 'local';
+                CONFIG.GITHUB_REPO = cfg.githubRepo || '';
+                CONFIG.JSONBIN_ID = cfg.jsonbinId || '';
+                
+                // UI
+                selectMode(CONFIG.STORAGE_MODE);
+                if (cfg.githubRepo) document.getElementById('githubRepo').value = cfg.githubRepo;
+                if (cfg.jsonbinId) {
+                    document.getElementById('jsonbinId').value = cfg.jsonbinId;
+                    document.getElementById('savedBinId').textContent = cfg.jsonbinId;
+                    document.getElementById('jsonbinSuccess').classList.add('active');
+                }
+            }
+        }
+
+        // Drag and Drop
+        function setupDragDrop() {
+            const area = document.getElementById('uploadArea');
+            
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(e => {
+                area.addEventListener(e, (ev) => {
+                    ev.preventDefault();
+                    ev.stopPropagation();
+                });
+            });
+
+            area.addEventListener('dragenter', () => area.classList.add('dragover'));
+            area.addEventListener('dragleave', () => area.classList.remove('dragover'));
+            area.addEventListener('drop', (e) => {
+                area.classList.remove('dragover');
+                if (e.dataTransfer.files.length) {
+                    processFile(e.dataTransfer.files[0]);
+                }
+            });
+        }
+
+        function handleFileSelect(e) {
+            if (e.target.files.length) {
+                processFile(e.target.files[0]);
+            }
+        }
+
+        // Processar Arquivo (Upload Único - Corrigido!)
+        async function processFile(file) {
+            showLoading(true, 'Lendo arquivo...');
             hideError();
 
             try {
-                const data = await readFile(file);
-                const parsed = parseData(data, ext);
+                // 1. Ler arquivo
+                const content = await readFile(file);
                 
-                if (parsed.length === 0) {
-                    throw new Error('Nenhum dado encontrado no arquivo');
-                }
-
+                // 2. Parse
+                const ext = file.name.split('.').pop().toLowerCase();
+                const parsed = ext === 'csv' ? parseCSV(content) : parseExcel(content);
+                
+                if (!parsed.length) throw new Error('Nenhum dado encontrado');
+                
+                // 3. Normalizar
                 allData = normalizeData(parsed);
                 
-                // Salvar no localStorage
-                saveToStorage(allData, file.name);
+                // 4. Salvar localmente primeiro
+                saveToLocal(allData);
                 
-                // Atualizar UI
-                updateFileInfo(file.name, allData.length);
+                // 5. Se modo nuvem, marcar para sync
+                if (CONFIG.STORAGE_MODE !== 'local') {
+                    pendingSync = true;
+                    document.getElementById('syncPanel').style.display = 'block';
+                }
+                
+                // 6. Mostrar dashboard imediatamente
                 showDashboard();
                 applyFilters();
                 
-                showToast(`✅ ${allData.length} registros carregados com sucesso!`);
+                showToast(`✅ ${allData.length} registros carregados!`);
                 
-            } catch (error) {
-                showError('Erro ao processar arquivo: ' + error.message);
-                console.error(error);
+                // 7. Auto-sync se configurado
+                if (pendingSync && CONFIG.STORAGE_MODE === 'jsonbin' && CONFIG.JSONBIN_KEY && CONFIG.JSONBIN_ID) {
+                    await uploadToCloud();
+                }
+                
+            } catch (e) {
+                showError('Erro: ' + e.message);
+                console.error(e);
             } finally {
                 showLoading(false);
             }
         }
 
-        // Ler arquivo
         function readFile(file) {
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
-                
-                reader.onprogress = (e) => {
-                    if (e.lengthComputable) {
-                        const percent = (e.loaded / e.total) * 100;
-                        updateProgress(percent);
-                    }
-                };
-
                 reader.onload = (e) => resolve(e.target.result);
-                reader.onerror = (e) => reject(e);
+                reader.onerror = reject;
                 
                 const ext = file.name.split('.').pop().toLowerCase();
-                if (ext === 'csv') {
-                    reader.readAsText(file);
-                } else {
-                    reader.readAsArrayBuffer(file);
-                }
+                if (ext === 'csv') reader.readAsText(file);
+                else reader.readAsArrayBuffer(file);
             });
-        }
-
-        function updateProgress(percent) {
-            const bar = document.getElementById('progressBar');
-            const fill = document.getElementById('progressFill');
-            bar.classList.add('active');
-            fill.style.width = percent + '%';
-        }
-
-        // Parse dados
-        function parseData(data, ext) {
-            if (ext === '.csv') {
-                return parseCSV(data);
-            } else {
-                return parseExcel(data);
-            }
         }
 
         function parseCSV(text) {
             const lines = text.split('\n').filter(l => l.trim());
-            if (lines.length === 0) return [];
-
             const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
             const result = [];
 
@@ -742,14 +958,11 @@
                 let inQuotes = false;
 
                 for (const char of lines[i]) {
-                    if (char === '"') {
-                        inQuotes = !inQuotes;
-                    } else if (char === ',' && !inQuotes) {
+                    if (char === '"') inQuotes = !inQuotes;
+                    else if (char === ',' && !inQuotes) {
                         values.push(current.trim());
                         current = '';
-                    } else {
-                        current += char;
-                    }
+                    } else current += char;
                 }
                 values.push(current.trim());
 
@@ -759,17 +972,15 @@
                 });
                 result.push(row);
             }
-
             return result;
         }
 
         function parseExcel(data) {
             const workbook = XLSX.read(data, { type: 'array' });
-            const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-            return XLSX.utils.sheet_to_json(firstSheet);
+            const sheet = workbook.Sheets[workbook.SheetNames[0]];
+            return XLSX.utils.sheet_to_json(sheet);
         }
 
-        // Normalizar dados (mesma lógica anterior)
         function normalizeData(data) {
             return data.map(row => {
                 const get = (...names) => {
@@ -782,19 +993,18 @@
                     return '';
                 };
 
-                const campanha = get('campanha', 'campaign', 'nome da campanha', 'name', 'campaign name');
+                const campanha = get('campanha', 'campaign', 'name', 'campaign name');
                 if (!campanha) return null;
 
-                // Detectar colunas
+                // Detectar colunas trocadas (Meta Ads)
                 const resultadosCol = get('resultados', 'results');
-                const veiculacaoCol = get('veiculação da campanha', 'status', 'state', 'veiculação', 'campaign status');
-                const gastoCol = get('valor usado (brl)', 'valor usado', 'spend', 'gasto', 'cost', 'amount spent');
+                const veiculacaoCol = get('veiculação', 'status', 'state');
+                const gastoCol = get('valor usado', 'spend', 'gasto', 'cost', 'amount spent');
                 const compCol = get('compras', 'purchases', 'conversions', 'website purchases');
-                const roasCol = get('roas', 'return on ad spend', 'retorno sobre o investimento', 'purchase roas');
+                const roasCol = get('roas', 'return on ad spend', 'purchase roas');
                 const receitaCol = get('receita', 'revenue', 'purchase value');
 
-                const isSwapped = resultadosCol === 'active' || resultadosCol === 'inactive' || 
-                                  (veiculacaoCol && !isNaN(parseFloat(veiculacaoCol)));
+                const isSwapped = resultadosCol === 'active' || resultadosCol === 'inactive';
 
                 let status, gasto, compras, roas, receita;
 
@@ -810,45 +1020,37 @@
                     roas = parseFloat(roasCol) || 0;
                 }
 
-                // Receita direta ou calculada
                 receita = parseFloat(receitaCol) || (gasto * roas);
 
                 // Parse data
-                let dataCamp = get('data', 'date', 'início dos relatórios', 'término dos relatórios', 'day');
+                let dataCamp = get('data', 'date', 'day');
                 let dataParsed = new Date().toISOString().split('T')[0];
 
                 if (dataCamp) {
-                    // Formato: 2026-03-01
-                    if (/^\d{4}-\d{2}-\d{2}$/.test(dataCamp)) {
-                        dataParsed = dataCamp;
-                    }
-                    // Formato: 01/03/2026
+                    if (/^\d{4}-\d{2}-\d{2}$/.test(dataCamp)) dataParsed = dataCamp;
                     else if (/^\d{2}\/\d{2}\/\d{4}$/.test(dataCamp)) {
                         const [d, m, y] = dataCamp.split('/');
                         dataParsed = `${y}-${m}-${d}`;
-                    }
-                    // Formato: 2026-03-01 00:00:00
-                    else if (dataCamp.includes(' ')) {
+                    } else if (dataCamp.includes(' ')) {
                         dataParsed = dataCamp.split(' ')[0];
-                    }
-                    // Formato Excel: número serial
-                    else if (!isNaN(dataCamp) && dataCamp > 40000) {
+                    } else if (!isNaN(dataCamp) && dataCamp > 40000) {
                         const excelDate = new Date((dataCamp - 25569) * 86400 * 1000);
                         dataParsed = excelDate.toISOString().split('T')[0];
                     }
                 }
 
-                // Detectar tipo
+                // Tipo
                 const name = campanha.toLowerCase();
                 let tipo = 'Outro';
                 if (name.includes('venda')) tipo = 'Venda';
-                else if (name.includes('lead') || name.includes('oferta')) tipo = 'Lead';
-                else if (name.includes('engajamento') || name.includes('topo funil')) tipo = 'Engajamento';
-                else if (name.includes('tráfego') || name.includes('seguidores')) tipo = 'Tráfego';
+                else if (name.includes('lead')) tipo = 'Lead';
+                else if (name.includes('engajamento')) tipo = 'Engajamento';
+                else if (name.includes('tráfego')) tipo = 'Tráfego';
 
                 return {
                     data: dataParsed,
-                    plataforma: detectPlatform(campanha),
+                    plataforma: name.includes('google') ? 'Google Ads' : 
+                               name.includes('tiktok') ? 'TikTok' : 'Meta Ads',
                     campanha,
                     tipo,
                     status: status.toLowerCase(),
@@ -861,127 +1063,279 @@
             }).filter(Boolean);
         }
 
-        function detectPlatform(campanha) {
-            const name = campanha.toLowerCase();
-            if (name.includes('google') || name.includes('ads')) return 'Google Ads';
-            if (name.includes('tiktok')) return 'TikTok';
-            if (name.includes('linkedin')) return 'LinkedIn';
-            return 'Meta Ads';
+        // Salvar Local
+        function saveToLocal(data) {
+            const payload = {
+                data: data,
+                timestamp: new Date().toISOString(),
+                version: 3
+            };
+            localStorage.setItem(CONFIG.LOCAL_KEY, JSON.stringify(payload));
         }
 
-        // Persistência
-        function saveToStorage(data, fileName) {
-            try {
-                const storageData = {
-                    data: data,
-                    fileName: fileName,
-                    timestamp: new Date().toISOString(),
-                    version: 2
-                };
-                
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(storageData));
-                
-                // Também salvar metadados separados para rápido acesso
-                const fileInfo = {
-                    name: fileName,
-                    records: data.length,
-                    lastUpdate: new Date().toLocaleString('pt-BR'),
-                    timestamp: new Date().toISOString()
-                };
-                localStorage.setItem(FILE_INFO_KEY, JSON.stringify(fileInfo));
-                
-            } catch (e) {
-                console.error('Erro ao salvar:', e);
-                if (e.name === 'QuotaExceededError') {
-                    showToast('⚠️ Arquivo muito grande! Tente um arquivo menor ou limpe dados antigos.', 'error');
-                }
-            }
-        }
-
-        function loadStoredData() {
-            try {
-                const stored = localStorage.getItem(STORAGE_KEY);
-                const fileInfo = localStorage.getItem(FILE_INFO_KEY);
-                
-                if (stored && fileInfo) {
-                    const parsed = JSON.parse(stored);
-                    const info = JSON.parse(fileInfo);
-                    
+        // Carregar Dados (Local ou Nuvem)
+        async function loadData() {
+            // Tentar nuvem primeiro se configurado
+            if (CONFIG.STORAGE_MODE === 'jsonbin' && CONFIG.JSONBIN_ID) {
+                await loadFromJsonBin();
+            } else if (CONFIG.STORAGE_MODE === 'github' && CONFIG.GITHUB_TOKEN) {
+                await loadFromGitHub();
+            } else {
+                // Local
+                const saved = localStorage.getItem(CONFIG.LOCAL_KEY);
+                if (saved) {
+                    const parsed = JSON.parse(saved);
                     allData = parsed.data || [];
-                    
-                    if (allData.length > 0) {
-                        updateFileInfo(info.name, allData.length, info.lastUpdate);
+                    if (allData.length) {
                         showDashboard();
-                        
-                        // Configurar datas padrão
-                        const dates = allData.map(d => d.data).filter(d => d).sort();
-                        if (dates.length > 0) {
-                            document.getElementById('dateStart').value = dates[0];
-                            document.getElementById('dateEnd').value = dates[dates.length - 1];
-                        }
-                        
                         applyFilters();
-                        
-                        document.getElementById('storageInfo').style.display = 'flex';
-                        document.getElementById('storageWarning').style.display = 'block';
+                        updateCloudStatus('local');
                     }
                 }
-            } catch (e) {
-                console.error('Erro ao carregar dados:', e);
             }
         }
 
-        function clearData() {
-            if (!confirm('Tem certeza que deseja apagar todos os dados? Esta ação não pode ser desfeita.')) {
+        // Upload para Nuvem
+        async function uploadToCloud() {
+            if (CONFIG.STORAGE_MODE === 'github') {
+                await uploadToGitHub();
+            } else if (CONFIG.STORAGE_MODE === 'jsonbin') {
+                await uploadToJsonBin();
+            }
+        }
+
+        async function uploadToGitHub() {
+            if (!CONFIG.GITHUB_TOKEN || !CONFIG.GITHUB_REPO) {
+                showError('Configure GitHub primeiro');
                 return;
             }
-            
-            localStorage.removeItem(STORAGE_KEY);
-            localStorage.removeItem(FILE_INFO_KEY);
-            
-            allData = [];
-            filteredData = [];
-            
-            document.getElementById('fileInfo').classList.remove('active');
-            document.getElementById('dashboardContent').classList.remove('active');
-            document.getElementById('uploadPanel').style.display = 'block';
-            document.getElementById('storageInfo').style.display = 'none';
-            document.getElementById('storageWarning').style.display = 'none';
-            
-            if (chart) {
-                chart.destroy();
-                chart = null;
+
+            showLoading(true, 'Salvando no GitHub...');
+            setCloudStatus('syncing');
+
+            try {
+                // Verificar se arquivo existe
+                let sha = null;
+                try {
+                    const getRes = await fetch(`https://api.github.com/repos/${CONFIG.GITHUB_REPO}/contents/${CONFIG.GITHUB_FILE_PATH}`, {
+                        headers: { 'Authorization': `token ${CONFIG.GITHUB_TOKEN}` }
+                    });
+                    if (getRes.ok) {
+                        const fileData = await getRes.json();
+                        sha = fileData.sha;
+                    }
+                } catch (e) { /* arquivo não existe */ }
+
+                // Preparar conteúdo
+                const content = btoa(unescape(encodeURIComponent(JSON.stringify({
+                    data: allData,
+                    updatedAt: new Date().toISOString(),
+                    version: 3
+                }, null, 2))));
+
+                // Criar/atualizar arquivo
+                const body = {
+                    message: `Update campaigns data - ${new Date().toLocaleString('pt-BR')}`,
+                    content: content,
+                    branch: CONFIG.GITHUB_BRANCH
+                };
+                if (sha) body.sha = sha;
+
+                const res = await fetch(`https://api.github.com/repos/${CONFIG.GITHUB_REPO}/contents/${CONFIG.GITHUB_FILE_PATH}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `token ${CONFIG.GITHUB_TOKEN}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(body)
+                });
+
+                if (!res.ok) throw new Error('Falha ao salvar');
+
+                pendingSync = false;
+                document.getElementById('syncPanel').style.display = 'none';
+                updateCloudStatus('synced');
+                showToast('☁️ Dados salvos no GitHub!');
+
+            } catch (e) {
+                showError('Erro GitHub: ' + e.message);
+                updateCloudStatus('error');
+            } finally {
+                showLoading(false);
             }
+        }
+
+        async function uploadToJsonBin() {
+            if (!CONFIG.JSONBIN_KEY) {
+                showError('Configure JSONBin primeiro');
+                return;
+            }
+
+            showLoading(true, 'Salvando na nuvem...');
+            setCloudStatus('syncing');
+
+            try {
+                const payload = {
+                    data: allData,
+                    updatedAt: new Date().toISOString(),
+                    version: 3
+                };
+
+                let url = 'https://api.jsonbin.io/v3/b';
+                let method = 'POST';
+                
+                if (CONFIG.JSONBIN_ID) {
+                    url = `https://api.jsonbin.io/v3/b/${CONFIG.JSONBIN_ID}`;
+                    method = 'PUT';
+                }
+
+                const res = await fetch(url, {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Master-Key': CONFIG.JSONBIN_KEY,
+                        'X-Bin-Private': 'false'
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await res.json();
+
+                if (!res.ok) throw new Error(result.message || 'Falha ao salvar');
+
+                // Salvar ID se novo
+                if (result.metadata && result.metadata.id && !CONFIG.JSONBIN_ID) {
+                    CONFIG.JSONBIN_ID = result.metadata.id;
+                    document.getElementById('jsonbinId').value = result.metadata.id;
+                    saveConfig();
+                }
+
+                pendingSync = false;
+                document.getElementById('syncPanel').style.display = 'none';
+                updateCloudStatus('synced');
+                showToast('☁️ Dados sincronizados!');
+
+            } catch (e) {
+                showError('Erro: ' + e.message);
+                updateCloudStatus('error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        async function loadFromJsonBin() {
+            if (!CONFIG.JSONBIN_ID) return;
+
+            setCloudStatus('syncing');
             
-            showToast('🗑️ Dados apagados com sucesso');
+            try {
+                const url = CONFIG.JSONBIN_KEY ? 
+                    `https://api.jsonbin.io/v3/b/${CONFIG.JSONBIN_ID}/latest` :
+                    `https://api.jsonbin.io/v3/b/${CONFIG.JSONBIN_ID}/latest?masterKey=false`;
+
+                const headers = {};
+                if (CONFIG.JSONBIN_KEY) headers['X-Master-Key'] = CONFIG.JSONBIN_KEY;
+
+                const res = await fetch(url, { headers });
+                if (!res.ok) throw new Error('Bin não encontrado');
+
+                const result = await res.json();
+                
+                if (result.record && result.record.data) {
+                    allData = result.record.data;
+                    saveToLocal(allData); // Backup local
+                    showDashboard();
+                    applyFilters();
+                    updateCloudStatus('synced');
+                    showToast('☁️ Dados carregados da nuvem!');
+                }
+
+            } catch (e) {
+                console.error('Erro ao carregar da nuvem:', e);
+                // Fallback para local
+                const saved = localStorage.getItem(CONFIG.LOCAL_KEY);
+                if (saved) {
+                    allData = JSON.parse(saved).data || [];
+                    if (allData.length) {
+                        showDashboard();
+                        applyFilters();
+                    }
+                }
+            }
+        }
+
+        async function loadFromGitHub() {
+            // Similar ao JSONBin mas usando raw.githubusercontent.com
+            try {
+                const rawUrl = `https://raw.githubusercontent.com/${CONFIG.GITHUB_REPO}/${CONFIG.GITHUB_BRANCH}/${CONFIG.GITHUB_FILE_PATH}`;
+                const res = await fetch(rawUrl);
+                
+                if (res.ok) {
+                    const data = await res.json();
+                    allData = data.data || [];
+                    saveToLocal(allData);
+                    showDashboard();
+                    applyFilters();
+                    updateCloudStatus('synced');
+                }
+            } catch (e) {
+                console.error('Erro GitHub:', e);
+            }
         }
 
         // UI Functions
-        function updateFileInfo(name, count, lastUpdate = null) {
-            document.getElementById('fileName').textContent = name;
-            document.getElementById('recordCount').textContent = count;
-            document.getElementById('lastUpload').textContent = lastUpdate || new Date().toLocaleString('pt-BR');
-            document.getElementById('fileInfo').classList.add('active');
-            document.getElementById('progressBar').classList.remove('active');
-        }
-
         function showDashboard() {
-            document.getElementById('uploadPanel').style.display = 'none';
+            document.getElementById('setupPanel').style.display = 'none';
             document.getElementById('dashboardContent').classList.add('active');
-            document.getElementById('storageInfo').style.display = 'flex';
-            document.getElementById('storageWarning').style.display = 'block';
+            document.getElementById('cloudStatus').style.display = 'flex';
+            
+            // Badge
+            const badge = document.getElementById('storageBadge');
+            if (CONFIG.STORAGE_MODE === 'github') badge.textContent = '🐙 GitHub';
+            else if (CONFIG.STORAGE_MODE === 'jsonbin') badge.textContent = '🗄️ Nuvem';
+            else badge.textContent = '💻 Local';
         }
 
         function showUpload() {
-            document.getElementById('uploadPanel').style.display = 'block';
+            document.getElementById('setupPanel').style.display = 'block';
             document.getElementById('dashboardContent').classList.remove('active');
         }
 
-        function processFile() {
-            if (currentFile) {
-                handleFile(currentFile);
+        function updateCloudStatus(status) {
+            const dot = document.getElementById('cloudDot');
+            const text = document.getElementById('cloudText');
+            
+            dot.className = 'cloud-dot';
+            
+            switch(status) {
+                case 'synced':
+                    dot.classList.add('syncing');
+                    text.textContent = '☁️ Sincronizado';
+                    break;
+                case 'syncing':
+                    dot.classList.add('syncing');
+                    text.textContent = '🔄 Sincronizando...';
+                    break;
+                case 'error':
+                    dot.classList.add('error');
+                    text.textContent = '❌ Erro de sync';
+                    break;
+                case 'local':
+                    dot.style.background = 'var(--gray)';
+                    text.textContent = '💻 Apenas Local';
+                    break;
+            }
+        }
+
+        function setCloudStatus(status) {
+            updateCloudStatus(status);
+        }
+
+        function syncData() {
+            if (pendingSync || CONFIG.STORAGE_MODE !== 'local') {
+                uploadToCloud();
             } else {
-                showToast('Selecione um arquivo primeiro', 'error');
+                showToast('Nada para sincronizar');
             }
         }
 
@@ -1034,17 +1388,12 @@
         function updateChart() {
             const byDate = {};
             filteredData.forEach(item => {
-                if (!byDate[item.data]) {
-                    byDate[item.data] = { gasto: 0, receita: 0 };
-                }
+                if (!byDate[item.data]) byDate[item.data] = { gasto: 0, receita: 0 };
                 byDate[item.data].gasto += item.gasto;
                 byDate[item.data].receita += item.receita;
             });
 
             const dates = Object.keys(byDate).sort();
-            const gastos = dates.map(d => byDate[d].gasto);
-            const receitas = dates.map(d => byDate[d].receita);
-
             const ctx = document.getElementById('mainChart').getContext('2d');
             
             if (chart) chart.destroy();
@@ -1059,7 +1408,7 @@
                     datasets: [
                         {
                             label: 'Investimento',
-                            data: gastos,
+                            data: dates.map(d => byDate[d].gasto),
                             borderColor: '#0084ff',
                             backgroundColor: 'rgba(0, 132, 255, 0.1)',
                             fill: true,
@@ -1067,7 +1416,7 @@
                         },
                         {
                             label: 'Receita',
-                            data: receitas,
+                            data: dates.map(d => byDate[d].receita),
                             borderColor: '#00c853',
                             backgroundColor: 'rgba(0, 200, 83, 0.1)',
                             fill: true,
@@ -1079,17 +1428,12 @@
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: {
-                        legend: {
-                            labels: { color: '#8b92a8' }
-                        }
+                        legend: { labels: { color: '#8b92a8' } }
                     },
                     scales: {
                         y: {
                             grid: { color: 'rgba(255,255,255,0.1)' },
-                            ticks: { 
-                                color: '#8b92a8',
-                                callback: v => 'R$ ' + (v/1000).toFixed(0) + 'k'
-                            }
+                            ticks: { color: '#8b92a8', callback: v => 'R$ ' + (v/1000).toFixed(0) + 'k' }
                         },
                         x: {
                             grid: { display: false },
@@ -1106,7 +1450,7 @@
 
             document.getElementById('resultCount').textContent = `(${filteredData.length})`;
 
-            if (filteredData.length === 0) {
+            if (!filteredData.length) {
                 tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 2rem;">Nenhum resultado</td></tr>';
                 return;
             }
@@ -1138,12 +1482,10 @@
         }
 
         function updateDataSummary() {
-            const fileInfo = JSON.parse(localStorage.getItem(FILE_INFO_KEY) || '{}');
-            const totalRecords = allData.length;
-            const filteredRecords = filteredData.length;
-            
+            const total = allData.length;
+            const filtered = filteredData.length;
             document.getElementById('dataSummary').textContent = 
-                `Arquivo: ${fileInfo.name || 'N/A'} | Total: ${totalRecords} registros | Filtrado: ${filteredRecords}`;
+                `Total: ${total} registros | Exibindo: ${filtered}`;
         }
 
         function formatDate(dateStr) {
@@ -1154,7 +1496,7 @@
 
         function clearFilters() {
             const dates = allData.map(d => d.data).filter(d => d).sort();
-            if (dates.length > 0) {
+            if (dates.length) {
                 document.getElementById('dateStart').value = dates[0];
                 document.getElementById('dateEnd').value = dates[dates.length - 1];
             }
@@ -1164,58 +1506,49 @@
             applyFilters();
         }
 
-        // Exportações
+        function clearAllData() {
+            if (!confirm('⚠️ Isso apagará TODOS os dados localmente e na nuvem (se sincronizado). Continuar?')) return;
+
+            allData = [];
+            filteredData = [];
+            localStorage.removeItem(CONFIG.LOCAL_KEY);
+            
+            // Tentar limpar na nuvem também
+            if (CONFIG.STORAGE_MODE === 'jsonbin' && CONFIG.JSONBIN_KEY && CONFIG.JSONBIN_ID) {
+                fetch(`https://api.jsonbin.io/v3/b/${CONFIG.JSONBIN_ID}`, {
+                    method: 'DELETE',
+                    headers: { 'X-Master-Key': CONFIG.JSONBIN_KEY }
+                }).catch(() => {});
+            }
+
+            showUpload();
+            showToast('🗑️ Todos os dados apagados');
+        }
+
         function exportData() {
-            if (filteredData.length === 0) {
+            if (!filteredData.length) {
                 showToast('Nenhum dado para exportar', 'error');
                 return;
             }
 
-            const headers = ['Data', 'Plataforma', 'Campanha', 'Tipo', 'Status', 'Gasto', 'Compras', 'ROAS', 'Receita', 'CPA'];
-            const rows = filteredData.map(item => [
-                item.data,
-                item.plataforma,
-                item.campanha,
-                item.tipo,
-                item.status,
-                item.gasto,
-                item.compras,
-                item.roas,
-                item.receita,
-                item.cpa
-            ]);
-
+            const headers = ['Data', 'Plataforma', 'Campanha', 'Tipo', 'Status', 'Gasto', 'Compras', 'ROAS', 'Receita'];
+            const rows = filteredData.map(i => [i.data, i.plataforma, i.campanha, i.tipo, i.status, i.gasto, i.compras, i.roas, i.receita]);
+            
             let csv = headers.join(',') + '\n';
-            rows.forEach(row => {
-                csv += row.map(cell => `"${cell}"`).join(',') + '\n';
-            });
+            rows.forEach(r => csv += r.map(c => `"${c}"`).join(',') + '\n');
 
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const blob = new Blob([csv], { type: 'text/csv' });
             const link = document.createElement('a');
             link.href = URL.createObjectURL(blob);
-            link.download = `mide_dashboard_export_${new Date().toISOString().split('T')[0]}.csv`;
+            link.download = `mide_export_${new Date().toISOString().split('T')[0]}.csv`;
             link.click();
             
-            showToast('📥 CSV exportado com sucesso!');
+            showToast('📥 CSV exportado!');
         }
 
-        function downloadTemplate() {
-            const template = `Data,Plataforma,Campanha,Tipo,Status,Gasto,Compras,ROAS
-2026-03-01,Meta Ads,[VENDA] Campanha Exemplo,Venda,active,1000.00,50,2.5
-2026-03-01,Meta Ads,[LEAD] Campanha Lead,Lead,active,500.00,25,1.8
-2026-03-02,Google Ads,[VENDA] Google Search,Venda,active,800.00,30,3.2`;
-            
-            const blob = new Blob([template], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = 'template_mide_dashboard.csv';
-            link.click();
-            
-            showToast('📋 Template baixado!');
-        }
-
-        // UI Helpers
-        function showLoading(show) {
+        // Helpers
+        function showLoading(show, text = 'Processando...') {
+            document.getElementById('loadingText').textContent = text;
             document.getElementById('loadingOverlay').classList.toggle('active', show);
         }
 
@@ -1223,6 +1556,7 @@
             const el = document.getElementById('errorMessage');
             el.textContent = msg;
             el.classList.add('active');
+            setTimeout(() => el.classList.remove('active'), 5000);
         }
 
         function hideError() {
@@ -1232,7 +1566,7 @@
         function showToast(msg, type = 'success') {
             const toast = document.getElementById('toast');
             toast.textContent = msg;
-            toast.style.borderColor = type === 'error' ? 'var(--danger)' : 'var(--glass-border)';
+            toast.style.borderLeft = type === 'error' ? '3px solid var(--danger)' : '3px solid var(--secondary)';
             toast.classList.add('show');
             setTimeout(() => toast.classList.remove('show'), 3000);
         }
