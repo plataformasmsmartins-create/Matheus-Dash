@@ -1,0 +1,1241 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MIDE Dashboard - Upload Local</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #0084ff;
+            --primary-dark: #0066cc;
+            --secondary: #00c853;
+            --warning: #ff9100;
+            --danger: #ff1744;
+            --dark: #0a0e27;
+            --darker: #050817;
+            --light: #ffffff;
+            --gray: #8b92a8;
+            --glass: rgba(255, 255, 255, 0.05);
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: linear-gradient(135deg, var(--darker) 0%, var(--dark) 100%);
+            color: var(--light);
+            min-height: 100vh;
+        }
+
+        .header {
+            background: var(--glass);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid var(--glass-border);
+            padding: 1.5rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .storage-info {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.875rem;
+            color: var(--gray);
+        }
+
+        .storage-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--secondary);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .upload-panel {
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .upload-area {
+            border: 2px dashed var(--glass-border);
+            border-radius: 16px;
+            padding: 3rem;
+            text-align: center;
+            transition: all 0.3s;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .upload-area:hover, .upload-area.dragover {
+            border-color: var(--primary);
+            background: rgba(0, 132, 255, 0.05);
+        }
+
+        .upload-area input[type="file"] {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        .upload-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .file-types {
+            color: var(--gray);
+            font-size: 0.875rem;
+            margin-top: 0.5rem;
+        }
+
+        .file-info {
+            background: rgba(0, 200, 83, 0.1);
+            border: 1px solid var(--secondary);
+            border-radius: 12px;
+            padding: 1rem;
+            margin-top: 1rem;
+            display: none;
+        }
+
+        .file-info.active {
+            display: block;
+            animation: fadeIn 0.3s;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin: 0.25rem;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(0, 132, 255, 0.3);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, var(--danger) 0%, #b71c1c 100%);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, var(--secondary) 0%, #00a344 100%);
+        }
+
+        .dashboard-content {
+            display: none;
+        }
+
+        .dashboard-content.active {
+            display: block;
+            animation: fadeIn 0.5s;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .data-status {
+            background: var(--glass);
+            border-radius: 12px;
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .data-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .data-badge {
+            background: rgba(0, 200, 83, 0.2);
+            color: var(--secondary);
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+
+        .filters-bar {
+            background: var(--glass);
+            border-radius: 12px;
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+            align-items: end;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+
+        .filter-group label {
+            font-size: 0.75rem;
+            color: var(--gray);
+            text-transform: uppercase;
+        }
+
+        input, select {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--glass-border);
+            border-radius: 8px;
+            padding: 0.5rem;
+            color: white;
+            font-size: 0.875rem;
+        }
+
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .kpi-card {
+            background: var(--glass);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 1.5rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .kpi-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+        }
+
+        .kpi-title {
+            font-size: 0.875rem;
+            color: var(--gray);
+            text-transform: uppercase;
+        }
+
+        .kpi-value {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-top: 0.5rem;
+        }
+
+        .chart-container {
+            background: var(--glass);
+            border-radius: 16px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .chart-wrapper {
+            position: relative;
+            height: 300px;
+        }
+
+        .table-container {
+            background: var(--glass);
+            border-radius: 16px;
+            padding: 1.5rem;
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.875rem;
+        }
+
+        th, td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        th {
+            color: var(--gray);
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+        }
+
+        .status-active { color: var(--secondary); }
+        .status-inactive { color: var(--gray); }
+        .roas-good { color: var(--secondary); }
+        .roas-medium { color: var(--warning); }
+        .roas-bad { color: var(--danger); }
+
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(10, 14, 39, 0.9);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .loading-overlay.active {
+            display: flex;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: var(--primary);
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            background: var(--glass);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--glass-border);
+            padding: 1rem 1.5rem;
+            border-radius: 12px;
+            transform: translateX(400px);
+            transition: transform 0.3s;
+            z-index: 1001;
+        }
+
+        .toast.show {
+            transform: translateX(0);
+        }
+
+        .error-message {
+            background: rgba(255, 23, 68, 0.1);
+            border: 1px solid var(--danger);
+            color: var(--danger);
+            padding: 1rem;
+            border-radius: 8px;
+            margin-top: 1rem;
+            display: none;
+        }
+
+        .error-message.active {
+            display: block;
+        }
+
+        .storage-warning {
+            background: rgba(255, 145, 0, 0.1);
+            border: 1px solid var(--warning);
+            color: var(--warning);
+            padding: 1rem;
+            border-radius: 8px;
+            margin-top: 1rem;
+            font-size: 0.875rem;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 2px;
+            margin-top: 1rem;
+            overflow: hidden;
+            display: none;
+        }
+
+        .progress-bar.active {
+            display: block;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+            width: 0%;
+            transition: width 0.3s;
+        }
+
+        @media (max-width: 768px) {
+            .kpi-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .upload-area {
+                padding: 2rem 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner"></div>
+        <p>Processando arquivo...</p>
+    </div>
+
+    <!-- Header -->
+    <div class="header">
+        <div class="logo">🎯 MIDE Dashboard</div>
+        <div class="storage-info" id="storageInfo" style="display: none;">
+            <span class="storage-dot"></span>
+            <span id="storageText">Dados salvos localmente</span>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Upload Panel -->
+        <div class="upload-panel" id="uploadPanel">
+            <h2 style="margin-bottom: 1rem;">📁 Upload de Arquivo</h2>
+            
+            <div class="upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()">
+                <input type="file" id="fileInput" accept=".csv,.xlsx,.xls" onchange="handleFileSelect(event)">
+                <div class="upload-icon">📊</div>
+                <h3>Clique ou arraste seu arquivo aqui</h3>
+                <p class="file-types">Formatos aceitos: CSV, Excel (.xlsx, .xls)</p>
+                <div class="progress-bar" id="progressBar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+            </div>
+
+            <div class="file-info" id="fileInfo">
+                <strong>✅ Arquivo carregado:</strong> <span id="fileName"></span>
+                <br><small style="color: var(--gray)">Registros: <span id="recordCount">0</span> | Última atualização: <span id="lastUpload"></span></small>
+                <div style="margin-top: 1rem;">
+                    <button class="btn" onclick="processFile()">🔄 Processar Novamente</button>
+                    <button class="btn btn-danger" onclick="clearData()">🗑️ Limpar Dados</button>
+                    <button class="btn btn-success" onclick="downloadTemplate()">📋 Baixar Template</button>
+                </div>
+            </div>
+
+            <div class="error-message" id="errorMessage"></div>
+            
+            <div class="storage-warning" id="storageWarning" style="display: none;">
+                ⚠️ <strong>Atenção:</strong> Os dados são armazenados apenas neste navegador. Limpar o cache do navegador ou usar modo anônimo apagará os dados.
+            </div>
+
+            <div style="margin-top: 1.5rem; padding: 1rem; background: rgba(0,132,255,0.1); border-radius: 8px; font-size: 0.875rem;">
+                <strong>📖 Instruções:</strong>
+                <ol style="margin-left: 1.2rem; margin-top: 0.5rem;">
+                    <li>Exporte seus dados do Meta Ads ou Google Ads</li>
+                    <li>Salve como CSV ou Excel (.xlsx)</li>
+                    <li>Arraste ou clique para fazer upload</li>
+                    <li>Os dados ficarão salvos até você limpar</li>
+                </ol>
+                <p style="margin-top: 0.5rem; color: var(--gray);">
+                    💡 <strong>Dica:</strong> O sistema detecta automaticamente as colunas (Data, Campanha, Gasto, Compras, ROAS, etc.)
+                </p>
+            </div>
+        </div>
+
+        <!-- Dashboard Content -->
+        <div class="dashboard-content" id="dashboardContent">
+            
+            <!-- Data Status Bar -->
+            <div class="data-status">
+                <div class="data-info">
+                    <span class="data-badge">💾 Dados Persistidos</span>
+                    <span id="dataSummary" style="color: var(--gray); font-size: 0.875rem;"></span>
+                </div>
+                <div>
+                    <button class="btn btn-secondary" onclick="showUpload()">
+                        📁 Novo Arquivo
+                    </button>
+                    <button class="btn btn-secondary" onclick="exportData()">
+                        💾 Exportar CSV
+                    </button>
+                    <button class="btn btn-danger" onclick="clearData()">
+                        🗑️ Limpar
+                    </button>
+                </div>
+            </div>
+
+            <!-- Filters -->
+            <div class="filters-bar">
+                <div class="filter-group">
+                    <label>Data Início</label>
+                    <input type="date" id="dateStart" onchange="applyFilters()">
+                </div>
+                <div class="filter-group">
+                    <label>Data Fim</label>
+                    <input type="date" id="dateEnd" onchange="applyFilters()">
+                </div>
+                <div class="filter-group">
+                    <label>Buscar Campanha</label>
+                    <input type="text" id="searchInput" placeholder="Nome..." onkeyup="applyFilters()">
+                </div>
+                <div class="filter-group">
+                    <label>Status</label>
+                    <select id="statusFilter" onchange="applyFilters()">
+                        <option value="all">Todos</option>
+                        <option value="active" selected>Ativos</option>
+                        <option value="inactive">Inativos</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>Tipo</label>
+                    <select id="typeFilter" onchange="applyFilters()">
+                        <option value="all">Todos</option>
+                        <option value="Venda">Venda</option>
+                        <option value="Lead">Lead</option>
+                        <option value="Engajamento">Engajamento</option>
+                        <option value="Tráfego">Tráfego</option>
+                    </select>
+                </div>
+                <button class="btn btn-secondary" onclick="clearFilters()">Limpar</button>
+            </div>
+
+            <!-- KPIs -->
+            <div class="kpi-grid" id="kpiSection"></div>
+
+            <!-- Charts -->
+            <div class="chart-container">
+                <h3 style="margin-bottom: 1rem;">📊 Evolução Diária</h3>
+                <div class="chart-wrapper">
+                    <canvas id="mainChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Table -->
+            <div class="table-container">
+                <h3 style="margin-bottom: 1rem;">📋 Campanhas <span id="resultCount"></span></h3>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Data</th>
+                            <th>Plataforma</th>
+                            <th>Campanha</th>
+                            <th>Tipo</th>
+                            <th>Status</th>
+                            <th>Gasto</th>
+                            <th>Compras</th>
+                            <th>ROAS</th>
+                            <th>Receita</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+        // Configuração
+        const STORAGE_KEY = 'mide_dashboard_data_v2';
+        const FILE_INFO_KEY = 'mide_dashboard_file_info';
+        
+        let allData = [];
+        let filteredData = [];
+        let chart = null;
+        let currentFile = null;
+
+        // Inicialização
+        window.addEventListener('load', () => {
+            loadStoredData();
+            setupDragDrop();
+        });
+
+        // Setup Drag and Drop
+        function setupDragDrop() {
+            const uploadArea = document.getElementById('uploadArea');
+            
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                uploadArea.addEventListener(eventName, preventDefaults, false);
+            });
+
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+
+            ['dragenter', 'dragover'].forEach(eventName => {
+                uploadArea.addEventListener(eventName, () => {
+                    uploadArea.classList.add('dragover');
+                }, false);
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                uploadArea.addEventListener(eventName, () => {
+                    uploadArea.classList.remove('dragover');
+                }, false);
+            });
+
+            uploadArea.addEventListener('drop', handleDrop, false);
+        }
+
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        }
+
+        function handleFileSelect(e) {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        }
+
+        // Processar arquivo
+        async function handleFile(file) {
+            currentFile = file;
+            
+            // Validar extensão
+            const validTypes = ['.csv', '.xlsx', '.xls'];
+            const ext = '.' + file.name.split('.').pop().toLowerCase();
+            
+            if (!validTypes.includes(ext)) {
+                showError('Formato não suportado. Use CSV ou Excel (.xlsx, .xls)');
+                return;
+            }
+
+            showLoading(true);
+            hideError();
+
+            try {
+                const data = await readFile(file);
+                const parsed = parseData(data, ext);
+                
+                if (parsed.length === 0) {
+                    throw new Error('Nenhum dado encontrado no arquivo');
+                }
+
+                allData = normalizeData(parsed);
+                
+                // Salvar no localStorage
+                saveToStorage(allData, file.name);
+                
+                // Atualizar UI
+                updateFileInfo(file.name, allData.length);
+                showDashboard();
+                applyFilters();
+                
+                showToast(`✅ ${allData.length} registros carregados com sucesso!`);
+                
+            } catch (error) {
+                showError('Erro ao processar arquivo: ' + error.message);
+                console.error(error);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Ler arquivo
+        function readFile(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                
+                reader.onprogress = (e) => {
+                    if (e.lengthComputable) {
+                        const percent = (e.loaded / e.total) * 100;
+                        updateProgress(percent);
+                    }
+                };
+
+                reader.onload = (e) => resolve(e.target.result);
+                reader.onerror = (e) => reject(e);
+                
+                const ext = file.name.split('.').pop().toLowerCase();
+                if (ext === 'csv') {
+                    reader.readAsText(file);
+                } else {
+                    reader.readAsArrayBuffer(file);
+                }
+            });
+        }
+
+        function updateProgress(percent) {
+            const bar = document.getElementById('progressBar');
+            const fill = document.getElementById('progressFill');
+            bar.classList.add('active');
+            fill.style.width = percent + '%';
+        }
+
+        // Parse dados
+        function parseData(data, ext) {
+            if (ext === '.csv') {
+                return parseCSV(data);
+            } else {
+                return parseExcel(data);
+            }
+        }
+
+        function parseCSV(text) {
+            const lines = text.split('\n').filter(l => l.trim());
+            if (lines.length === 0) return [];
+
+            const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+            const result = [];
+
+            for (let i = 1; i < lines.length; i++) {
+                const values = [];
+                let current = '';
+                let inQuotes = false;
+
+                for (const char of lines[i]) {
+                    if (char === '"') {
+                        inQuotes = !inQuotes;
+                    } else if (char === ',' && !inQuotes) {
+                        values.push(current.trim());
+                        current = '';
+                    } else {
+                        current += char;
+                    }
+                }
+                values.push(current.trim());
+
+                const row = {};
+                headers.forEach((h, idx) => {
+                    row[h] = values[idx]?.replace(/^"|"$/g, '') || '';
+                });
+                result.push(row);
+            }
+
+            return result;
+        }
+
+        function parseExcel(data) {
+            const workbook = XLSX.read(data, { type: 'array' });
+            const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+            return XLSX.utils.sheet_to_json(firstSheet);
+        }
+
+        // Normalizar dados (mesma lógica anterior)
+        function normalizeData(data) {
+            return data.map(row => {
+                const get = (...names) => {
+                    for (const name of names) {
+                        const key = Object.keys(row).find(k => 
+                            k.toLowerCase().includes(name.toLowerCase())
+                        );
+                        if (key) return row[key];
+                    }
+                    return '';
+                };
+
+                const campanha = get('campanha', 'campaign', 'nome da campanha', 'name', 'campaign name');
+                if (!campanha) return null;
+
+                // Detectar colunas
+                const resultadosCol = get('resultados', 'results');
+                const veiculacaoCol = get('veiculação da campanha', 'status', 'state', 'veiculação', 'campaign status');
+                const gastoCol = get('valor usado (brl)', 'valor usado', 'spend', 'gasto', 'cost', 'amount spent');
+                const compCol = get('compras', 'purchases', 'conversions', 'website purchases');
+                const roasCol = get('roas', 'return on ad spend', 'retorno sobre o investimento', 'purchase roas');
+                const receitaCol = get('receita', 'revenue', 'purchase value');
+
+                const isSwapped = resultadosCol === 'active' || resultadosCol === 'inactive' || 
+                                  (veiculacaoCol && !isNaN(parseFloat(veiculacaoCol)));
+
+                let status, gasto, compras, roas, receita;
+
+                if (isSwapped) {
+                    status = resultadosCol || 'inactive';
+                    gasto = parseFloat(veiculacaoCol) || 0;
+                    compras = parseFloat(roasCol) || 0;
+                    roas = parseFloat(compCol) || 0;
+                } else {
+                    status = veiculacaoCol || 'inactive';
+                    gasto = parseFloat(gastoCol) || 0;
+                    compras = parseFloat(compCol) || 0;
+                    roas = parseFloat(roasCol) || 0;
+                }
+
+                // Receita direta ou calculada
+                receita = parseFloat(receitaCol) || (gasto * roas);
+
+                // Parse data
+                let dataCamp = get('data', 'date', 'início dos relatórios', 'término dos relatórios', 'day');
+                let dataParsed = new Date().toISOString().split('T')[0];
+
+                if (dataCamp) {
+                    // Formato: 2026-03-01
+                    if (/^\d{4}-\d{2}-\d{2}$/.test(dataCamp)) {
+                        dataParsed = dataCamp;
+                    }
+                    // Formato: 01/03/2026
+                    else if (/^\d{2}\/\d{2}\/\d{4}$/.test(dataCamp)) {
+                        const [d, m, y] = dataCamp.split('/');
+                        dataParsed = `${y}-${m}-${d}`;
+                    }
+                    // Formato: 2026-03-01 00:00:00
+                    else if (dataCamp.includes(' ')) {
+                        dataParsed = dataCamp.split(' ')[0];
+                    }
+                    // Formato Excel: número serial
+                    else if (!isNaN(dataCamp) && dataCamp > 40000) {
+                        const excelDate = new Date((dataCamp - 25569) * 86400 * 1000);
+                        dataParsed = excelDate.toISOString().split('T')[0];
+                    }
+                }
+
+                // Detectar tipo
+                const name = campanha.toLowerCase();
+                let tipo = 'Outro';
+                if (name.includes('venda')) tipo = 'Venda';
+                else if (name.includes('lead') || name.includes('oferta')) tipo = 'Lead';
+                else if (name.includes('engajamento') || name.includes('topo funil')) tipo = 'Engajamento';
+                else if (name.includes('tráfego') || name.includes('seguidores')) tipo = 'Tráfego';
+
+                return {
+                    data: dataParsed,
+                    plataforma: detectPlatform(campanha),
+                    campanha,
+                    tipo,
+                    status: status.toLowerCase(),
+                    gasto,
+                    compras,
+                    roas,
+                    receita,
+                    cpa: compras > 0 ? gasto / compras : 0
+                };
+            }).filter(Boolean);
+        }
+
+        function detectPlatform(campanha) {
+            const name = campanha.toLowerCase();
+            if (name.includes('google') || name.includes('ads')) return 'Google Ads';
+            if (name.includes('tiktok')) return 'TikTok';
+            if (name.includes('linkedin')) return 'LinkedIn';
+            return 'Meta Ads';
+        }
+
+        // Persistência
+        function saveToStorage(data, fileName) {
+            try {
+                const storageData = {
+                    data: data,
+                    fileName: fileName,
+                    timestamp: new Date().toISOString(),
+                    version: 2
+                };
+                
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(storageData));
+                
+                // Também salvar metadados separados para rápido acesso
+                const fileInfo = {
+                    name: fileName,
+                    records: data.length,
+                    lastUpdate: new Date().toLocaleString('pt-BR'),
+                    timestamp: new Date().toISOString()
+                };
+                localStorage.setItem(FILE_INFO_KEY, JSON.stringify(fileInfo));
+                
+            } catch (e) {
+                console.error('Erro ao salvar:', e);
+                if (e.name === 'QuotaExceededError') {
+                    showToast('⚠️ Arquivo muito grande! Tente um arquivo menor ou limpe dados antigos.', 'error');
+                }
+            }
+        }
+
+        function loadStoredData() {
+            try {
+                const stored = localStorage.getItem(STORAGE_KEY);
+                const fileInfo = localStorage.getItem(FILE_INFO_KEY);
+                
+                if (stored && fileInfo) {
+                    const parsed = JSON.parse(stored);
+                    const info = JSON.parse(fileInfo);
+                    
+                    allData = parsed.data || [];
+                    
+                    if (allData.length > 0) {
+                        updateFileInfo(info.name, allData.length, info.lastUpdate);
+                        showDashboard();
+                        
+                        // Configurar datas padrão
+                        const dates = allData.map(d => d.data).filter(d => d).sort();
+                        if (dates.length > 0) {
+                            document.getElementById('dateStart').value = dates[0];
+                            document.getElementById('dateEnd').value = dates[dates.length - 1];
+                        }
+                        
+                        applyFilters();
+                        
+                        document.getElementById('storageInfo').style.display = 'flex';
+                        document.getElementById('storageWarning').style.display = 'block';
+                    }
+                }
+            } catch (e) {
+                console.error('Erro ao carregar dados:', e);
+            }
+        }
+
+        function clearData() {
+            if (!confirm('Tem certeza que deseja apagar todos os dados? Esta ação não pode ser desfeita.')) {
+                return;
+            }
+            
+            localStorage.removeItem(STORAGE_KEY);
+            localStorage.removeItem(FILE_INFO_KEY);
+            
+            allData = [];
+            filteredData = [];
+            
+            document.getElementById('fileInfo').classList.remove('active');
+            document.getElementById('dashboardContent').classList.remove('active');
+            document.getElementById('uploadPanel').style.display = 'block';
+            document.getElementById('storageInfo').style.display = 'none';
+            document.getElementById('storageWarning').style.display = 'none';
+            
+            if (chart) {
+                chart.destroy();
+                chart = null;
+            }
+            
+            showToast('🗑️ Dados apagados com sucesso');
+        }
+
+        // UI Functions
+        function updateFileInfo(name, count, lastUpdate = null) {
+            document.getElementById('fileName').textContent = name;
+            document.getElementById('recordCount').textContent = count;
+            document.getElementById('lastUpload').textContent = lastUpdate || new Date().toLocaleString('pt-BR');
+            document.getElementById('fileInfo').classList.add('active');
+            document.getElementById('progressBar').classList.remove('active');
+        }
+
+        function showDashboard() {
+            document.getElementById('uploadPanel').style.display = 'none';
+            document.getElementById('dashboardContent').classList.add('active');
+            document.getElementById('storageInfo').style.display = 'flex';
+            document.getElementById('storageWarning').style.display = 'block';
+        }
+
+        function showUpload() {
+            document.getElementById('uploadPanel').style.display = 'block';
+            document.getElementById('dashboardContent').classList.remove('active');
+        }
+
+        function processFile() {
+            if (currentFile) {
+                handleFile(currentFile);
+            } else {
+                showToast('Selecione um arquivo primeiro', 'error');
+            }
+        }
+
+        // Filtros e Visualização
+        function applyFilters() {
+            const start = document.getElementById('dateStart').value;
+            const end = document.getElementById('dateEnd').value;
+            const search = document.getElementById('searchInput').value.toLowerCase();
+            const status = document.getElementById('statusFilter').value;
+            const type = document.getElementById('typeFilter').value;
+
+            filteredData = allData.filter(item => {
+                if (start && item.data < start) return false;
+                if (end && item.data > end) return false;
+                if (status !== 'all' && item.status !== status) return false;
+                if (type !== 'all' && item.tipo !== type) return false;
+                if (search && !item.campanha.toLowerCase().includes(search)) return false;
+                return true;
+            });
+
+            updateKPIs();
+            updateChart();
+            updateTable();
+            updateDataSummary();
+        }
+
+        function updateKPIs() {
+            const total = filteredData.reduce((s, i) => s + i.gasto, 0);
+            const compras = filteredData.reduce((s, i) => s + i.compras, 0);
+            const receita = filteredData.reduce((s, i) => s + i.receita, 0);
+            const roas = total > 0 ? (receita / total).toFixed(2) : 0;
+            const cpa = compras > 0 ? (total / compras).toFixed(2) : 0;
+
+            const kpis = [
+                { title: '💰 Investimento', value: `R$ ${total.toLocaleString('pt-BR', {minimumFractionDigits: 2})}` },
+                { title: '🛒 Compras', value: compras.toLocaleString() },
+                { title: '📈 ROAS', value: `${roas}x`, color: roas >= 3 ? 'var(--secondary)' : 'var(--warning)' },
+                { title: '💸 CPA', value: `R$ ${cpa}` },
+                { title: '💎 Receita', value: `R$ ${receita.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`, color: 'var(--secondary)' }
+            ];
+
+            document.getElementById('kpiSection').innerHTML = kpis.map(k => `
+                <div class="kpi-card">
+                    <div class="kpi-title">${k.title}</div>
+                    <div class="kpi-value" style="color: ${k.color || 'white'}">${k.value}</div>
+                </div>
+            `).join('');
+        }
+
+        function updateChart() {
+            const byDate = {};
+            filteredData.forEach(item => {
+                if (!byDate[item.data]) {
+                    byDate[item.data] = { gasto: 0, receita: 0 };
+                }
+                byDate[item.data].gasto += item.gasto;
+                byDate[item.data].receita += item.receita;
+            });
+
+            const dates = Object.keys(byDate).sort();
+            const gastos = dates.map(d => byDate[d].gasto);
+            const receitas = dates.map(d => byDate[d].receita);
+
+            const ctx = document.getElementById('mainChart').getContext('2d');
+            
+            if (chart) chart.destroy();
+
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: dates.map(d => {
+                        const [y, m, day] = d.split('-');
+                        return `${day}/${m}`;
+                    }),
+                    datasets: [
+                        {
+                            label: 'Investimento',
+                            data: gastos,
+                            borderColor: '#0084ff',
+                            backgroundColor: 'rgba(0, 132, 255, 0.1)',
+                            fill: true,
+                            tension: 0.4
+                        },
+                        {
+                            label: 'Receita',
+                            data: receitas,
+                            borderColor: '#00c853',
+                            backgroundColor: 'rgba(0, 200, 83, 0.1)',
+                            fill: true,
+                            tension: 0.4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: { color: '#8b92a8' }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            grid: { color: 'rgba(255,255,255,0.1)' },
+                            ticks: { 
+                                color: '#8b92a8',
+                                callback: v => 'R$ ' + (v/1000).toFixed(0) + 'k'
+                            }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#8b92a8' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateTable() {
+            const tbody = document.getElementById('tableBody');
+            const search = document.getElementById('searchInput').value;
+
+            document.getElementById('resultCount').textContent = `(${filteredData.length})`;
+
+            if (filteredData.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 2rem;">Nenhum resultado</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = filteredData.map(item => {
+                let name = item.campanha;
+                if (search) {
+                    const regex = new RegExp(`(${search})`, 'gi');
+                    name = name.replace(regex, '<mark style="background: rgba(0,132,255,0.3); color: white;">$1</mark>');
+                }
+
+                const statusClass = item.status === 'active' ? 'status-active' : 'status-inactive';
+                const roasClass = item.roas >= 3 ? 'roas-good' : item.roas >= 1 ? 'roas-medium' : 'roas-bad';
+
+                return `
+                    <tr>
+                        <td>${formatDate(item.data)}</td>
+                        <td>${item.plataforma}</td>
+                        <td>${name}<br><small style="color: var(--gray)">${item.tipo}</small></td>
+                        <td>${item.tipo}</td>
+                        <td class="${statusClass}">${item.status === 'active' ? 'Ativo' : 'Inativo'}</td>
+                        <td>R$ ${item.gasto.toFixed(2)}</td>
+                        <td>${item.compras}</td>
+                        <td class="${roasClass}">${item.roas.toFixed(2)}x</td>
+                        <td>R$ ${item.receita.toFixed(2)}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function updateDataSummary() {
+            const fileInfo = JSON.parse(localStorage.getItem(FILE_INFO_KEY) || '{}');
+            const totalRecords = allData.length;
+            const filteredRecords = filteredData.length;
+            
+            document.getElementById('dataSummary').textContent = 
+                `Arquivo: ${fileInfo.name || 'N/A'} | Total: ${totalRecords} registros | Filtrado: ${filteredRecords}`;
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return '-';
+            const [y, m, d] = dateStr.split('-');
+            return `${d}/${m}/${y}`;
+        }
+
+        function clearFilters() {
+            const dates = allData.map(d => d.data).filter(d => d).sort();
+            if (dates.length > 0) {
+                document.getElementById('dateStart').value = dates[0];
+                document.getElementById('dateEnd').value = dates[dates.length - 1];
+            }
+            document.getElementById('searchInput').value = '';
+            document.getElementById('statusFilter').value = 'active';
+            document.getElementById('typeFilter').value = 'all';
+            applyFilters();
+        }
+
+        // Exportações
+        function exportData() {
+            if (filteredData.length === 0) {
+                showToast('Nenhum dado para exportar', 'error');
+                return;
+            }
+
+            const headers = ['Data', 'Plataforma', 'Campanha', 'Tipo', 'Status', 'Gasto', 'Compras', 'ROAS', 'Receita', 'CPA'];
+            const rows = filteredData.map(item => [
+                item.data,
+                item.plataforma,
+                item.campanha,
+                item.tipo,
+                item.status,
+                item.gasto,
+                item.compras,
+                item.roas,
+                item.receita,
+                item.cpa
+            ]);
+
+            let csv = headers.join(',') + '\n';
+            rows.forEach(row => {
+                csv += row.map(cell => `"${cell}"`).join(',') + '\n';
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `mide_dashboard_export_${new Date().toISOString().split('T')[0]}.csv`;
+            link.click();
+            
+            showToast('📥 CSV exportado com sucesso!');
+        }
+
+        function downloadTemplate() {
+            const template = `Data,Plataforma,Campanha,Tipo,Status,Gasto,Compras,ROAS
+2026-03-01,Meta Ads,[VENDA] Campanha Exemplo,Venda,active,1000.00,50,2.5
+2026-03-01,Meta Ads,[LEAD] Campanha Lead,Lead,active,500.00,25,1.8
+2026-03-02,Google Ads,[VENDA] Google Search,Venda,active,800.00,30,3.2`;
+            
+            const blob = new Blob([template], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'template_mide_dashboard.csv';
+            link.click();
+            
+            showToast('📋 Template baixado!');
+        }
+
+        // UI Helpers
+        function showLoading(show) {
+            document.getElementById('loadingOverlay').classList.toggle('active', show);
+        }
+
+        function showError(msg) {
+            const el = document.getElementById('errorMessage');
+            el.textContent = msg;
+            el.classList.add('active');
+        }
+
+        function hideError() {
+            document.getElementById('errorMessage').classList.remove('active');
+        }
+
+        function showToast(msg, type = 'success') {
+            const toast = document.getElementById('toast');
+            toast.textContent = msg;
+            toast.style.borderColor = type === 'error' ? 'var(--danger)' : 'var(--glass-border)';
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+    </script>
+</body>
+</html>
